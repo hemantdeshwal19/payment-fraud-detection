@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, MagicMock, AsyncMock
 import os
 os.environ["API_KEY"] = "test-key"
 os.environ["FRAUD_SCORER_URL"] = "http://mock-scorer"
@@ -28,10 +28,10 @@ def test_invalid_api_key():
     assert response.status_code == 401
 
 def test_approved_transaction():
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.json.return_value = {"score": 10, "risk": "low"}
 
-    with patch("httpx.AsyncClient.post", return_value=mock_response):
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_response):
         response = client.post("/transaction",
             json={"card_last4": "1234", "amount": 100.0, "merchant": "amazon.com"},
             headers={"x-api-key": "test-key"}
@@ -40,10 +40,10 @@ def test_approved_transaction():
     assert response.json()["status"] == "approved"
 
 def test_blocked_high_risk_transaction():
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.json.return_value = {"score": 90, "risk": "high"}
 
-    with patch("httpx.AsyncClient.post", return_value=mock_response):
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_response):
         response = client.post("/transaction",
             json={"card_last4": "1234", "amount": 100.0, "merchant": "shadystore.com"},
             headers={"x-api-key": "test-key"}
