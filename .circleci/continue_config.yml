@@ -118,4 +118,3 @@ workflows:
             - secret-scan
             - sast-scan
             - test
-
