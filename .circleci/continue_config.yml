@@ -43,9 +43,12 @@ jobs:
           name: Install TruffleHog v3
           command: |
             curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+            export PATH=$HOME/bin:$PATH
       - run:
           name: Scan for secrets
-          command: trufflehog filesystem . --fail 
+          command: |
+            export PATH=$HOME/bin:$PATH 
+            trufflehog filesystem . --fail 
 
   sast-scan:
     parameters:
