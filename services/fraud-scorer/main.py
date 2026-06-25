@@ -46,3 +46,4 @@ def score_transaction(txn: Transaction):
     score, risk = calculate_score(txn)
     return {"score": score, "risk": risk}
 # test
+# test dynamic config
