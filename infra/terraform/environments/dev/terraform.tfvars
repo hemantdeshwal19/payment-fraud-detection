@@ -1,0 +1,5 @@
+location              = "centralus"
+environment           = "dev"
+transaction_api_image = "hemantdeshwal19/transaction-api:latest"
+fraud_scorer_image    = "hemantdeshwal19/fraud-scorer:latest"
+fraud_scorer_url      = "https://fraud-scorer.placeholder.azurecontainerapps.io"

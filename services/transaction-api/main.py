@@ -25,13 +25,13 @@ def health():
 async def process_transaction(txn: Transaction, x_api_key: str = Header(...)):
     verify_key(x_api_key)
     
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
             f"{FRAUD_SCORER_URL}/score",
             json=txn.model_dump()
         )
     
-    result = await  response.json()
+    result =  response.json()
     
     if result["risk"] == "high":
         raise HTTPException(status_code=403, detail="Transaction blocked — high fraud risk")
