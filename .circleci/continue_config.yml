@@ -1,0 +1,121 @@
+version: 2.1
+
+orbs:
+  docker: circleci/docker@2.6.0
+
+parameters:
+  run-transaction-api:
+    type: boolean
+    default: false
+  run-fraud-scorer:
+    type: boolean
+    default: false
+  run-infra:
+    type: boolean
+    default: false
+
+jobs:
+  test:
+    parameters:
+      service:
+        type: string
+    docker:
+      - image: cimg/python:3.11
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command: |
+            cd services/<< parameters.service >>
+            pip install -r requirements.txt
+      - run:
+          name: Run tests
+          command: |
+            cd services/<< parameters.service >>
+            pytest tests/ -v
+
+  secret-scan:
+    docker:
+      - image: cimg/python:3.11
+    steps:
+      - checkout
+      - run:
+          name: Install TruffleHog
+          command: pip install trufflehog
+      - run:
+          name: Scan for secrets
+          command: trufflehog filesystem . --fail
+
+  sast-scan:
+    parameters:
+      service:
+        type: string
+    docker:
+      - image: cimg/python:3.11
+    steps:
+      - checkout
+      - run:
+          name: Install Semgrep
+          command: pip install semgrep
+      - run:
+          name: Run SAST
+          command: |
+            semgrep scan services/<< parameters.service >> \
+              --config=p/python \
+              --error
+
+  build-and-scan:
+    parameters:
+      service:
+        type: string
+    docker:
+      - image: cimg/python:3.11
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Build Docker image
+          command: |
+            docker build -t << parameters.service >>:$CIRCLE_SHA1 \
+              services/<< parameters.service >>
+      - run:
+          name: Install Trivy
+          command: |
+            curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+      - run:
+          name: Scan image for CVEs
+          command: |
+            trivy image --exit-code 1 --severity CRITICAL \
+              << parameters.service >>:$CIRCLE_SHA1
+
+workflows:
+  transaction-api-pipeline:
+    when: << pipeline.parameters.run-transaction-api >>
+    jobs:
+      - secret-scan
+      - sast-scan:
+          service: transaction-api
+      - test:
+          service: transaction-api
+      - build-and-scan:
+          service: transaction-api
+          requires:
+            - secret-scan
+            - sast-scan
+            - test
+
+  fraud-scorer-pipeline:
+    when: << pipeline.parameters.run-fraud-scorer >>
+    jobs:
+      - secret-scan
+      - sast-scan:
+          service: fraud-scorer
+      - test:
+          service: fraud-scorer
+      - build-and-scan:
+          service: fraud-scorer
+          requires:
+            - secret-scan
+            - sast-scan
+            - test
+

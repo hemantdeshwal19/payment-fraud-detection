@@ -1,0 +1,19 @@
+cat > .circleci/config.yml << 'EOF'
+version: 2.1
+
+setup: true
+
+orbs:
+  path-filtering: circleci/path-filtering@1.1.0
+
+workflows:
+  setup-workflow:
+    jobs:
+      - path-filtering/filter:
+          base-revision: main
+          config-path: .circleci/continue_config.yml
+          mapping: |
+            services/transaction-api/.* run-transaction-api true
+            services/fraud-scorer/.* run-fraud-scorer true
+            infra/.* run-infra true
+EOF
