@@ -1,4 +1,3 @@
-cat > .circleci/config.yml << 'EOF'
 version: 2.1
 
 setup: true
@@ -16,4 +15,3 @@ workflows:
             services/transaction-api/.* run-transaction-api true
             services/fraud-scorer/.* run-fraud-scorer true
             infra/.* run-infra true
-EOF
