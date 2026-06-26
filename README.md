@@ -1,45 +1,45 @@
-Payment Fraud Detection — DevSecOps Pipeline on Azure
+# Payment Fraud Detection — DevSecOps Pipeline on Azure
 
-A production-grade microservices fraud detection system built to demonstrate deep CircleCI expertise. Features dynamic config, matrix testing, fan-out/fan-in security gates, and automated deployment to Azure Container Apps via Terraform-managed infrastructure.
+A production-grade **microservices fraud detection system** built to demonstrate deep CircleCI expertise. Features dynamic config, matrix testing, fan-out/fan-in security gates, and automated deployment to Azure Container Apps via Terraform-managed infrastructure.
 
+---
 
-Table of Contents
+## Table of Contents
 
+- [What This Project Does](#what-this-project-does)
+- [Architecture](#architecture)
+- [Services](#services)
+- [CI/CD Pipeline](#cicd-pipeline)
+- [CircleCI Features Demonstrated](#circleci-features-demonstrated)
+- [Security Gates](#security-gates)
+- [Infrastructure](#infrastructure)
+- [GitFlow Strategy](#gitflow-strategy)
+- [PCI-DSS Control Mapping](#pci-dss-control-mapping)
+- [Running Locally](#running-locally)
+- [Environment Variables](#environment-variables)
+- [Project Structure](#project-structure)
+- [API Reference](#api-reference)
 
-What This Project Does
-Architecture
-Services
-CI/CD Pipeline
-CircleCI Features Demonstrated
-Security Gates
-Infrastructure
-GitFlow Strategy
-PCI-DSS Control Mapping
-Running Locally
-Environment Variables
-Project Structure
-API Reference
+---
 
+## What This Project Does
 
+Simulates a real-world payment processing system where every transaction is **scored for fraud risk** before approval. The system consists of two independent microservices communicating over HTTPS, deployed to Azure Container Apps, with a full DevSecOps pipeline that enforces security controls on every push.
 
-What This Project Does
+**Key capabilities:**
 
-Simulates a real-world payment processing system where every transaction is scored for fraud risk before approval. The system consists of two independent microservices communicating over HTTPS, deployed to Azure Container Apps, with a full DevSecOps pipeline that enforces security controls on every push.
+- Rule-based fraud scoring across merchant reputation, transaction amount, and card patterns
+- API key authentication with timing-attack-safe comparison
+- Automated secret scanning, SAST, and container CVE scanning on every commit
+- Dynamic CI/CD — only rebuilds the service that actually changed
+- Matrix testing across Python 3.10 and 3.11 simultaneously
+- Terraform-managed Azure infrastructure with remote state
 
-Key capabilities:
+---
 
+## Architecture
 
-Rule-based fraud scoring across merchant reputation, transaction amount, and card patterns
-API key authentication with timing-attack-safe comparison
-Automated secret scanning, SAST, and container CVE scanning on every commit
-Dynamic CI/CD — only rebuilds the service that actually changed
-Matrix testing across Python 3.10 and 3.11 simultaneously
-Terraform-managed Azure infrastructure with remote state
-
-
-
-Architecture
-
+```
 Developer pushes to dev branch
           │
           ▼
@@ -74,20 +74,27 @@ Developer pushes to dev branch
 │  POST /transaction    POST /score                    │
 │  GET  /health         GET  /health                   │
 └─────────────────────────────────────────────────────┘
+```
 
+---
 
-Services
+## Services
 
-Transaction API (services/transaction-api)
+### Transaction API (`services/transaction-api`)
 
-Responsibility: Accept incoming payment transactions, call the fraud scorer, and approve or block based on risk.
+**Responsibility:** Accept incoming payment transactions, call the fraud scorer, and approve or block based on risk.
 
-Endpoints:
+**Endpoints:**
 
-MethodPathAuthDescriptionGET/healthNoneHealth checkPOST/transactionx-api-keySubmit transaction for fraud checkGET/docsNoneSwagger UI
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/health` | None | Health check |
+| `POST` | `/transaction` | `x-api-key` | Submit transaction for fraud check |
+| `GET` | `/docs` | None | Swagger UI |
 
-Flow:
+**Flow:**
 
+```
 Client → POST /transaction
            │
            ▼
@@ -100,42 +107,67 @@ Client → POST /transaction
    high risk   low/medium risk
       │              │
    403 Blocked    200 Approved
+```
 
+---
 
-Fraud Scorer (services/fraud-scorer)
+### Fraud Scorer (`services/fraud-scorer`)
 
-Responsibility: Score a transaction based on rule-based signals. Returns a numeric score (0–100) and risk level.
+**Responsibility:** Score a transaction based on rule-based signals. Returns a numeric score (0–100) and risk level.
 
-Scoring Rules:
+**Scoring Rules:**
 
-SignalConditionScore AddedMerchant reputationKnown bad merchant+80Transaction amount≥ $10,000+60Transaction amount≥ $5,000+30Card patternSuspicious last4 (0000, 9999)+40
+| Signal | Condition | Score Added |
+|--------|-----------|-------------|
+| Merchant reputation | Known bad merchant | +80 |
+| Transaction amount | ≥ $10,000 | +60 |
+| Transaction amount | ≥ $5,000 | +30 |
+| Card pattern | Suspicious last4 (`0000`, `9999`) | +40 |
 
-Risk Thresholds:
+**Risk Thresholds:**
 
-Score RangeRisk LevelAction0 – 59low / mediumApproved60 – 100highBlocked (403)
+| Score Range | Risk Level | Action |
+|-------------|------------|--------|
+| 0 – 59 | `low` / `medium` | Approved |
+| 60 – 100 | `high` | Blocked (403) |
 
+---
 
-CI/CD Pipeline
+## CI/CD Pipeline
 
-Entry Point — config.yml
+### Entry Point — `config.yml`
 
-yamlsetup: true
+```yaml
+setup: true
+```
 
-Uses the continuation orb to implement dynamic config. On every push, a filter-paths job compares changed files against origin/main and sets pipeline parameters:
+Uses the **continuation orb** to implement dynamic config. On every push, a `filter-paths` job compares changed files against `origin/main` and sets pipeline parameters:
 
-Changed PathParameter Setservices/transaction-api/**run-transaction-api: trueservices/fraud-scorer/**run-fraud-scorer: trueinfra/**run-infra: true
+| Changed Path | Parameter Set |
+|---|---|
+| `services/transaction-api/**` | `run-transaction-api: true` |
+| `services/fraud-scorer/**` | `run-fraud-scorer: true` |
+| `infra/**` | `run-infra: true` |
 
-Only the affected service pipeline runs. Unchanged services are skipped entirely — saving CI credits and reducing noise.
+**Only the affected service pipeline runs.** Unchanged services are skipped entirely — saving CI credits and reducing noise.
 
+---
 
-Pipeline — continue_config.yml
+### Pipeline — `continue_config.yml`
 
-Jobs
+#### Jobs
 
-JobImagePurposesecret-scancimg/python:3.11TruffleHog v3 scans entire repo for leaked credentialssast-scancimg/python:3.11Semgrep scans service directory for insecure code patternstestcimg/python:3.10 / 3.11pytest runs unit tests — matrix across two Python versionsbuild-and-scancimg/python:3.11Docker build + Trivy CVE scan on built imagedeploycimg/azure:2024.03az containerapp update — deploys new image to Azure
+| Job | Image | Purpose |
+|-----|-------|---------|
+| `secret-scan` | `cimg/python:3.11` | TruffleHog v3 scans entire repo for leaked credentials |
+| `sast-scan` | `cimg/python:3.11` | Semgrep scans service directory for insecure code patterns |
+| `test` | `cimg/python:3.10` / `3.11` | pytest runs unit tests — matrix across two Python versions |
+| `build-and-scan` | `cimg/python:3.11` | Docker build + Trivy CVE scan on built image |
+| `deploy` | `cimg/azure:2024.03` | `az containerapp update` — deploys new image to Azure |
 
-Fan-Out / Fan-In Pattern
+#### Fan-Out / Fan-In Pattern
 
+```
 secret-scan ──┐
 sast-scan ────┤ (fan-out — all run in parallel)
 test-3.10 ────┤
@@ -146,40 +178,68 @@ test-3.11 ────┘
               │
               ▼
            deploy
+```
 
-build-and-scan only starts when all parallel jobs pass. A single failure blocks the pipeline.
+`build-and-scan` only starts when **all** parallel jobs pass. A single failure blocks the pipeline.
 
-Matrix Jobs
+#### Matrix Jobs
 
-yamltest:
+```yaml
+test:
   matrix:
     parameters:
       service: [transaction-api]
       python-version: ["3.10", "3.11"]
+```
 
-CircleCI generates two parallel jobs: test-3.10-transaction-api and test-3.11-transaction-api. Both must pass before build-and-scan proceeds.
+CircleCI generates two parallel jobs: `test-3.10-transaction-api` and `test-3.11-transaction-api`. Both must pass before `build-and-scan` proceeds.
 
+---
 
-CircleCI Features Demonstrated
+## CircleCI Features Demonstrated
 
-FeatureWhere UsedWhyDynamic configconfig.yml → continue_config.ymlOnly builds changed service — critical at scalePath filteringfilter-paths jobDetects which service changed using git diffPipeline parametersrun-transaction-api, run-fraud-scorerControls which workflow runsParameterized jobstest, sast-scan, build-and-scan, deployOne job definition handles both servicesMatrix jobstest jobParallel testing across Python 3.10 and 3.11Fan-out / Fan-inSecurity gates → build-and-scanAll checks must pass before buildContextsazure-dev on deploy jobSecure credential injection per environmentBranch filteringdeploy jobOnly deploys on dev branch, not PRsContinuation orbconfig.ymlEnables dynamic config handoff$CIRCLE_SHA1Docker image tagTraces every image back to exact commit
+| Feature | Where Used | Why |
+|---------|------------|-----|
+| **Dynamic config** | `config.yml` → `continue_config.yml` | Only builds changed service — critical at scale |
+| **Path filtering** | `filter-paths` job | Detects which service changed using `git diff` |
+| **Pipeline parameters** | `run-transaction-api`, `run-fraud-scorer` | Controls which workflow runs |
+| **Parameterized jobs** | `test`, `sast-scan`, `build-and-scan`, `deploy` | One job definition handles both services |
+| **Matrix jobs** | `test` job | Parallel testing across Python 3.10 and 3.11 |
+| **Fan-out / Fan-in** | Security gates → `build-and-scan` | All checks must pass before build |
+| **Contexts** | `azure-dev` on deploy job | Secure credential injection per environment |
+| **Branch filtering** | `deploy` job | Only deploys on `dev` branch, not PRs |
+| **Continuation orb** | `config.yml` | Enables dynamic config handoff |
+| **`$CIRCLE_SHA1`** | Docker image tag | Traces every image back to exact commit |
 
+---
 
-Security Gates
+## Security Gates
 
-GateToolBlocks OnSecret scanningTruffleHog v3API keys, credentials, tokens in codeSASTSemgrep (p/python)Insecure code patterns, hardcoded secretsUnit testspytestAny test failureContainer CVE scanTrivyCRITICAL severity CVEs in Docker image
+| Gate | Tool | Blocks On |
+|------|------|-----------|
+| Secret scanning | TruffleHog v3 | API keys, credentials, tokens in code |
+| SAST | Semgrep (`p/python`) | Insecure code patterns, hardcoded secrets |
+| Unit tests | pytest | Any test failure |
+| Container CVE scan | Trivy | `CRITICAL` severity CVEs in Docker image |
 
-All gates run in parallel. A failure in any one blocks the build immediately.
+**All gates run in parallel.** A failure in any one blocks the build immediately.
 
+---
 
-Infrastructure
+## Infrastructure
 
-Stack
+### Stack
 
-ComponentTechnologyContainer hostingAzure Container AppsIaCTerraform v1.15+State backendAzure Blob Storage (tfstatepaymentfraud)Container registryDocker Hub
+| Component | Technology |
+|-----------|------------|
+| Container hosting | Azure Container Apps |
+| IaC | Terraform v1.15+ |
+| State backend | Azure Blob Storage (`tfstatepaymentfraud`) |
+| Container registry | Docker Hub |
 
-Terraform Structure
+### Terraform Structure
 
+```
 infra/terraform/
 ├── modules/
 │   ├── resource-group/     # Reusable RG module
@@ -187,29 +247,32 @@ infra/terraform/
 └── environments/
     ├── dev/                # Dev environment config
     └── prod/               # Prod environment config (future)
+```
 
-Design decisions:
+**Design decisions:**
 
+- **Modular** — `container-app` module is reused for both services. No duplication.
+- **Remote state** — Terraform state stored in Azure Blob Storage with locking. Safe for CI/CD.
+- **Mandatory tagging** — All resources tagged with `Environment`, `Project`, `Owner`, `ManagedBy`.
+- **Scale to zero** — `min_replicas = 0` on transaction-api keeps costs minimal.
+- **Fraud scorer always warm** — `min_replicas = 1` prevents cold-start timeouts.
 
-Modular — container-app module is reused for both services. No duplication.
-Remote state — Terraform state stored in Azure Blob Storage with locking. Safe for CI/CD.
-Mandatory tagging — All resources tagged with Environment, Project, Owner, ManagedBy.
-Scale to zero — min_replicas = 0 on transaction-api keeps costs minimal.
-Fraud scorer always warm — min_replicas = 1 prevents cold-start timeouts.
+### Resource Tags
 
-
-Resource Tags
-
-hcltags = {
+```hcl
+tags = {
   Environment = "dev"
   Project     = "payment-fraud-detection"
   Owner       = "hemant"
   ManagedBy   = "terraform"
 }
+```
 
+---
 
-GitFlow Strategy
+## GitFlow Strategy
 
+```
 main ──────────────────────────────────────► production
   ▲                                              ▲
   │ PR + merge                        PR + merge │
@@ -217,68 +280,96 @@ main ─────────────────────────
 dev ──────────────────────────────────────► staging deploy
   ▲
   │ feature branches (future)
+```
 
-BranchPipeline TriggerDeploys TodevFull pipeline + deployAzure dev environmentmainFull pipeline (approval gate — future)Azure prod environment
+| Branch | Pipeline Trigger | Deploys To |
+|--------|-----------------|------------|
+| `dev` | Full pipeline + deploy | Azure dev environment |
+| `main` | Full pipeline (approval gate — future) | Azure prod environment |
 
-Rule: No direct commits to main. All changes flow through dev via PR.
+**Rule:** No direct commits to `main`. All changes flow through `dev` via PR.
 
+---
 
-PCI-DSS Control Mapping
+## PCI-DSS Control Mapping
 
-PCI-DSS RequirementControlEnforced ByReq 6.3 — Identify vulnerabilitiesStatic code analysisSemgrep SASTReq 6.4 — Protect public-facing appsContainer CVE scanningTrivyReq 7.1 — Restrict accessAPI key on all endpointsx-api-key headerReq 8.2 — No hardcoded credentialsSecret detection on every pushTruffleHog v3Req 10.2 — Audit trailImage tagged with Git SHA$CIRCLE_SHA1Req 12.3 — Controlled changesBranch protection + CI gatesCircleCI + GitFlow
+| PCI-DSS Requirement | Control | Enforced By |
+|---------------------|---------|-------------|
+| Req 6.3 — Identify vulnerabilities | Static code analysis | Semgrep SAST |
+| Req 6.4 — Protect public-facing apps | Container CVE scanning | Trivy |
+| Req 7.1 — Restrict access | API key on all endpoints | `x-api-key` header |
+| Req 8.2 — No hardcoded credentials | Secret detection on every push | TruffleHog v3 |
+| Req 10.2 — Audit trail | Image tagged with Git SHA | `$CIRCLE_SHA1` |
+| Req 12.3 — Controlled changes | Branch protection + CI gates | CircleCI + GitFlow |
 
+---
 
-Running Locally
+## Running Locally
 
-Prerequisites
+### Prerequisites
 
+- Python 3.10+
+- Docker
 
-Python 3.10+
-Docker
+### Fraud Scorer
 
-
-Fraud Scorer
-
-bashcd services/fraud-scorer
+```bash
+cd services/fraud-scorer
 pip install -r requirements.txt
 uvicorn main:app --port 8001 --reload
+```
 
-Transaction API
+### Transaction API
 
-bashcd services/transaction-api
+```bash
+cd services/transaction-api
 pip install -r requirements.txt
 
 export API_KEY=test-key
 export FRAUD_SCORER_URL=http://localhost:8001
 
 uvicorn main:app --port 8000 --reload
+```
 
-Run Tests
+### Run Tests
 
-bash# Fraud Scorer
+```bash
+# Fraud Scorer
 cd services/fraud-scorer
 pytest tests/ -v
 
 # Transaction API
 cd services/transaction-api
 pytest tests/ -v
+```
 
+---
 
-Environment Variables
+## Environment Variables
 
-Transaction API
+### Transaction API
 
-VariableDescriptionRequiredAPI_KEYAPI key for authenticating requestsYesFRAUD_SCORER_URLInternal URL of fraud scorer serviceYes
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `API_KEY` | API key for authenticating requests | Yes |
+| `FRAUD_SCORER_URL` | Internal URL of fraud scorer service | Yes |
 
-CircleCI Contexts
+### CircleCI Contexts
 
-azure-dev
+#### `azure-dev`
 
-VariableDescriptionAZURE_CLIENT_IDService principal app IDAZURE_CLIENT_SECRETService principal passwordAZURE_TENANT_IDAzure tenant IDAZURE_SUBSCRIPTION_IDAzure subscription ID
+| Variable | Description |
+|----------|-------------|
+| `AZURE_CLIENT_ID` | Service principal app ID |
+| `AZURE_CLIENT_SECRET` | Service principal password |
+| `AZURE_TENANT_ID` | Azure tenant ID |
+| `AZURE_SUBSCRIPTION_ID` | Azure subscription ID |
 
+---
 
-Project Structure
+## Project Structure
 
+```
 payment-fraud-detection/
 ├── .circleci/
 │   ├── config.yml              # Dynamic config entry point
@@ -304,54 +395,64 @@ payment-fraud-detection/
         └── environments/
             ├── dev/
             └── prod/
+```
 
+---
 
-API Reference
+## API Reference
 
-Transaction API
+### Transaction API
 
-Base URL: https://transaction-api-dev.<region>.azurecontainerapps.io
+**Base URL:** `https://transaction-api-dev.<region>.azurecontainerapps.io`
 
-POST /transaction
+#### `POST /transaction`
 
-bashcurl -X POST <BASE_URL>/transaction \
+```bash
+curl -X POST <BASE_URL>/transaction \
   -H "Content-Type: application/json" \
   -H "x-api-key: your-api-key" \
   -d '{"card_last4": "1234", "amount": 100.0, "merchant": "amazon.com"}'
+```
 
-Approved response (200):
+**Approved response (200):**
+```json
+{"status": "approved", "fraud_score": 0}
+```
 
-json{"status": "approved", "fraud_score": 0}
+**Blocked response (403):**
+```json
+{"detail": "Transaction blocked — high fraud risk"}
+```
 
-Blocked response (403):
+**Swagger UI:** `<BASE_URL>/docs`
 
-json{"detail": "Transaction blocked — high fraud risk"}
+---
 
-Swagger UI: <BASE_URL>/docs
+### Fraud Scorer
 
+**Base URL:** `https://fraud-scorer-dev.<region>.azurecontainerapps.io`
 
-Fraud Scorer
+#### `POST /score`
 
-Base URL: https://fraud-scorer-dev.<region>.azurecontainerapps.io
-
-POST /score
-
-bashcurl -X POST <BASE_URL>/score \
+```bash
+curl -X POST <BASE_URL>/score \
   -H "Content-Type: application/json" \
   -d '{"card_last4": "1234", "amount": 15000.0, "merchant": "shadystore.com"}'
+```
 
-Response:
+**Response:**
+```json
+{"score": 100, "risk": "high"}
+```
 
-json{"score": 100, "risk": "high"}
+---
 
+## Roadmap
 
-Roadmap
-
-
- Manual approval gate before prod deploy
- prod environment Terraform config
- Azure Key Vault for secret management
- OWASP ZAP DAST scanning
- Rate limiting on transaction API
- Audit logging to Azure Monitor
- Luhn algorithm card validation
+- [ ] Manual approval gate before prod deploy
+- [ ] `prod` environment Terraform config
+- [ ] Azure Key Vault for secret management
+- [ ] OWASP ZAP DAST scanning
+- [ ] Rate limiting on transaction API
+- [ ] Audit logging to Azure Monitor
+- [ ] Luhn algorithm card validation
