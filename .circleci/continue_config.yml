@@ -92,6 +92,33 @@ jobs:
             trivy image --exit-code 1 --severity CRITICAL \
               << parameters.service >>:$CIRCLE_SHA1
 
+  deploy:
+    parameters:
+      service:
+        type: string
+      container-port:
+        type: integer
+    environment:
+      ENVIRONMENT: dev
+    docker:
+      - image: cimg/azure:2024.03
+    steps:
+      - checkout
+      - run:
+          name: Azure Login
+          command: |
+            az login --service-principal \
+              --username $AZURE_CLIENT_ID \
+              --password $AZURE_CLIENT_SECRET \
+              --tenant $AZURE_TENANT_ID
+      - run:
+          name: Deploy to Azure Container Apps
+          command: |
+            az containerapp update \
+              --name << parameters.service >>-$ENVIRONMENT \
+              --resource-group payment-fraud-$ENVIRONMENT-rg \
+              --image hemantdeshwal19/<< parameters.service >>:$CIRCLE_SHA1
+
 workflows:
   transaction-api-pipeline:
     when: << pipeline.parameters.run-transaction-api >>
@@ -107,6 +134,16 @@ workflows:
             - secret-scan
             - sast-scan
             - test
+      - deploy:
+          service: transaction-api
+          container-port: 8000
+          requires:
+            - build-and-scan
+          context:
+            - azure-dev
+          filters:
+            branches:
+              only: dev
 
   fraud-scorer-pipeline:
     when: << pipeline.parameters.run-fraud-scorer >>
@@ -122,3 +159,13 @@ workflows:
             - secret-scan
             - sast-scan
             - test
+      - deploy:
+          service: fraud-scorer
+          container-port: 8001
+          requires:
+            - build-and-scan
+          context:
+            - azure-dev
+          filters:
+            branches:
+              only: dev
