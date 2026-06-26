@@ -19,8 +19,10 @@ jobs:
     parameters:
       service:
         type: string
+      python-version:
+        type: string
     docker:
-      - image: cimg/python:3.11
+      - image: cimg/python:<< parameters.python-version >>
     steps:
       - checkout
       - run:
@@ -29,7 +31,7 @@ jobs:
             cd services/<< parameters.service >>
             pip install -r requirements.txt
       - run:
-          name: Run tests
+          name: Run tests (Python << parameters.python-version >>)
           command: |
             cd services/<< parameters.service >>
             pytest tests/ -v
@@ -127,13 +129,17 @@ workflows:
       - sast-scan:
           service: transaction-api
       - test:
-          service: transaction-api
+          matrix:
+            parameters:
+              service: [transaction-api]
+              python-version: ["3.10", "3.11"]
       - build-and-scan:
           service: transaction-api
           requires:
             - secret-scan
             - sast-scan
-            - test
+            - test-3.10-transaction-api
+            - test-3.11-transaction-api
       - deploy:
           service: transaction-api
           container-port: 8000
@@ -152,13 +158,24 @@ workflows:
       - sast-scan:
           service: fraud-scorer
       - test:
-          service: fraud-scorer
+          matrix:
+            parameters:
+              service: [fraud-scorer]
+              python-version: ["3.10", "3.11"]
       - build-and-scan:
           service: fraud-scorer
           requires:
             - secret-scan
             - sast-scan
-            - test
+            - test-3.10-fraud-scorer
+            - test-3.11-fraud-scorer
+      - build-and-scan:
+          service: fraud-scorer
+          requires:
+            - secret-scan
+            - sast-scan
+            - test-3.10-fraud-scorer
+            - test-3.11-fraud-scorer
       - deploy:
           service: fraud-scorer
           container-port: 8001
