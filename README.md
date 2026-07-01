@@ -86,11 +86,11 @@ Developer pushes to dev branch
 
 **Endpoints:**
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `GET` | `/health` | None | Health check |
-| `POST` | `/transaction` | `x-api-key` | Submit transaction for fraud check |
-| `GET` | `/docs` | None | Swagger UI |
+| Method | Path           | Auth               | Description                        |
+|--------|------          |------              |-------------                       |
+| `GET`  | `/health`      | None               | Health check                       |
+| `POST` | `/transaction` | `x-api-key`        | Submit transaction for fraud check |
+| `GET`  | `/docs`        | None               | Swagger UI                         |
 
 **Flow:**
 
@@ -117,19 +117,19 @@ Client → POST /transaction
 
 **Scoring Rules:**
 
-| Signal | Condition | Score Added |
-|--------|-----------|-------------|
-| Merchant reputation | Known bad merchant | +80 |
-| Transaction amount | ≥ $10,000 | +60 |
-| Transaction amount | ≥ $5,000 | +30 |
-| Card pattern | Suspicious last4 (`0000`, `9999`) | +40 |
+| Signal              | Condition                         | Score Added |
+|--------             |-----------                        |-------------|
+| Merchant reputation | Known bad merchant                | +80 |
+| Transaction amount  | ≥ $10,000                         | +60 |
+| Transaction amount  | ≥ $5,000                          | +30 |
+| Card pattern        | Suspicious last4 (`0000`, `9999`) | +40 |
 
 **Risk Thresholds:**
 
-| Score Range | Risk Level | Action |
-|-------------|------------|--------|
-| 0 – 59 | `low` / `medium` | Approved |
-| 60 – 100 | `high` | Blocked (403) |
+| Score Range | Risk Level       | Action        |
+|-------------|------------      |--------       |
+| 0 – 59      | `low` / `medium` | Approved      |
+| 60 – 100    | `high`           | Blocked (403) |
 
 ---
 
@@ -143,11 +143,11 @@ setup: true
 
 Uses the **continuation orb** to implement dynamic config. On every push, a `filter-paths` job compares changed files against `origin/main` and sets pipeline parameters:
 
-| Changed Path | Parameter Set |
-|---|---|
+| Changed Path                  | Parameter Set               |
+|---                            |---                          |
 | `services/transaction-api/**` | `run-transaction-api: true` |
-| `services/fraud-scorer/**` | `run-fraud-scorer: true` |
-| `infra/**` | `run-infra: true` |
+| `services/fraud-scorer/**`    | `run-fraud-scorer: true`    |
+| `infra/**`                    | `run-infra: true`           |
 
 **Only the affected service pipeline runs.** Unchanged services are skipped entirely — saving CI credits and reducing noise.
 
@@ -157,13 +157,13 @@ Uses the **continuation orb** to implement dynamic config. On every push, a `fil
 
 #### Jobs
 
-| Job | Image | Purpose |
-|-----|-------|---------|
-| `secret-scan` | `cimg/python:3.11` | TruffleHog v3 scans entire repo for leaked credentials |
-| `sast-scan` | `cimg/python:3.11` | Semgrep scans service directory for insecure code patterns |
-| `test` | `cimg/python:3.10` / `3.11` | pytest runs unit tests — matrix across two Python versions |
-| `build-and-scan` | `cimg/python:3.11` | Docker build + Trivy CVE scan on built image |
-| `deploy` | `cimg/azure:2024.03` | `az containerapp update` — deploys new image to Azure |
+| Job                                   | Image                        | Purpose                                                    |
+|-----                                  |-------                       |---------                                                   |
+| `secret-scan`                         | `cimg/python:3.11`           | TruffleHog v3 scans entire repo for leaked credentials     |
+| `sast-scan`                           | `cimg/python:3.11`           | Semgrep scans service directory for insecure code patterns |
+| `test`                                | `cimg/python:3.10` / `3.11`  | pytest runs unit tests — matrix across two Python versions |
+| `build-and-scan`                      | `cimg/python:3.11`           | Docker build + Trivy CVE scan on built image               |
+| `deploy`                              | `cimg/azure:2024.03`         | `az containerapp update` — deploys new image to Azure      |
 
 #### Fan-Out / Fan-In Pattern
 
@@ -198,29 +198,29 @@ CircleCI generates two parallel jobs: `test-3.10-transaction-api` and `test-3.11
 
 ## CircleCI Features Demonstrated
 
-| Feature | Where Used | Why |
-|---------|------------|-----|
-| **Dynamic config** | `config.yml` → `continue_config.yml` | Only builds changed service — critical at scale |
-| **Path filtering** | `filter-paths` job | Detects which service changed using `git diff` |
-| **Pipeline parameters** | `run-transaction-api`, `run-fraud-scorer` | Controls which workflow runs |
-| **Parameterized jobs** | `test`, `sast-scan`, `build-and-scan`, `deploy` | One job definition handles both services |
-| **Matrix jobs** | `test` job | Parallel testing across Python 3.10 and 3.11 |
-| **Fan-out / Fan-in** | Security gates → `build-and-scan` | All checks must pass before build |
-| **Contexts** | `azure-dev` on deploy job | Secure credential injection per environment |
-| **Branch filtering** | `deploy` job | Only deploys on `dev` branch, not PRs |
-| **Continuation orb** | `config.yml` | Enables dynamic config handoff |
-| **`$CIRCLE_SHA1`** | Docker image tag | Traces every image back to exact commit |
+| Feature                 | Where Used                                      | Why                                               | 
+|---------                |------------                                     |-----                                              |
+| **Dynamic config**      | `config.yml` → `continue_config.yml`            | Only builds changed service — critical at scale   |
+| **Path filtering**      | `filter-paths` job                              | Detects which service changed using `git diff`    |
+| **Pipeline parameters** | `run-transaction-api`, `run-fraud-scorer`       | Controls which workflow runs                      |
+| **Parameterized jobs**  | `test`, `sast-scan`, `build-and-scan`, `deploy` | One job definition handles both services          |
+| **Matrix jobs**         | `test` job                                      | Parallel testing across Python 3.10 and 3.11      |
+| **Fan-out / Fan-in**    | Security gates → `build-and-scan`               | All checks must pass before build                 |
+| **Contexts**            | `azure-dev` on deploy job                       | Secure credential injection per environment       |
+| **Branch filtering**    | `deploy` job                                    | Only deploys on `dev` branch, not PRs             |
+| **Continuation orb**    | `config.yml`                                    | Enables dynamic config handoff                    |
+| **`$CIRCLE_SHA1`**      | Docker image tag                                | Traces every image back to exact commit           |
 
 ---
 
 ## Security Gates
 
-| Gate | Tool | Blocks On |
-|------|------|-----------|
-| Secret scanning | TruffleHog v3 | API keys, credentials, tokens in code |
-| SAST | Semgrep (`p/python`) | Insecure code patterns, hardcoded secrets |
-| Unit tests | pytest | Any test failure |
-| Container CVE scan | Trivy | `CRITICAL` severity CVEs in Docker image |
+| Gate               | Tool                 | Blocks On                                 |
+|------              |------                |-----------                                |
+| Secret scanning    | TruffleHog v3        | API keys, credentials, tokens in code     |
+| SAST               | Semgrep (`p/python`) | Insecure code patterns, hardcoded secrets |
+| Unit tests         | pytest               | Any test failure                          |
+| Container CVE scan | Trivy                | `CRITICAL` severity CVEs in Docker image  |
 
 **All gates run in parallel.** A failure in any one blocks the build immediately.
 
@@ -230,12 +230,12 @@ CircleCI generates two parallel jobs: `test-3.10-transaction-api` and `test-3.11
 
 ### Stack
 
-| Component | Technology |
-|-----------|------------|
-| Container hosting | Azure Container Apps |
-| IaC | Terraform v1.15+ |
-| State backend | Azure Blob Storage (`tfstatepaymentfraud`) |
-| Container registry | Docker Hub |
+| Component          | Technology                                 |
+|-----------         |------------                                |
+| Container hosting  | Azure Container Apps                       |
+| IaC                | Terraform v1.15+                           |
+| State backend      | Azure Blob Storage (`tfstatepaymentfraud`) |
+| Container registry | Docker Hub                                 |
 
 ### Terraform Structure
 
@@ -282,9 +282,9 @@ dev ─────────────────────────�
   │ feature branches (future)
 ```
 
-| Branch | Pipeline Trigger | Deploys To |
-|--------|-----------------|------------|
-| `dev` | Full pipeline + deploy | Azure dev environment |
+| Branch | Pipeline Trigger                       | Deploys To             |
+|--------|-----------------                       |------------            |
+| `dev`  | Full pipeline + deploy                 | Azure dev environment  |
 | `main` | Full pipeline (approval gate — future) | Azure prod environment |
 
 **Rule:** No direct commits to `main`. All changes flow through `dev` via PR.
@@ -293,14 +293,14 @@ dev ─────────────────────────�
 
 ## PCI-DSS Control Mapping
 
-| PCI-DSS Requirement | Control | Enforced By |
-|---------------------|---------|-------------|
-| Req 6.3 — Identify vulnerabilities | Static code analysis | Semgrep SAST |
-| Req 6.4 — Protect public-facing apps | Container CVE scanning | Trivy |
-| Req 7.1 — Restrict access | API key on all endpoints | `x-api-key` header |
-| Req 8.2 — No hardcoded credentials | Secret detection on every push | TruffleHog v3 |
-| Req 10.2 — Audit trail | Image tagged with Git SHA | `$CIRCLE_SHA1` |
-| Req 12.3 — Controlled changes | Branch protection + CI gates | CircleCI + GitFlow |
+| PCI-DSS Requirement                  | Control                        | Enforced By        |
+|---------------------                 |---------                       |-------------       |
+| Req 6.3 — Identify vulnerabilities   | Static code analysis           | Semgrep SAST       |
+| Req 6.4 — Protect public-facing apps | Container CVE scanning         | Trivy              |
+| Req 7.1 — Restrict access            | API key on all endpoints       | `x-api-key` header |
+| Req 8.2 — No hardcoded credentials   | Secret detection on every push | TruffleHog v3      |
+| Req 10.2 — Audit trail               | Image tagged with Git SHA      | `$CIRCLE_SHA1`     |
+| Req 12.3 — Controlled changes        | Branch protection + CI gates   | CircleCI + GitFlow |
 
 ---
 
@@ -349,21 +349,21 @@ pytest tests/ -v
 
 ### Transaction API
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `API_KEY` | API key for authenticating requests | Yes |
-| `FRAUD_SCORER_URL` | Internal URL of fraud scorer service | Yes |
+| Variable           | Description                          | Required |
+|----------          |-------------                         |----------|
+| `API_KEY`          | API key for authenticating requests  | Yes      |
+| `FRAUD_SCORER_URL` | Internal URL of fraud scorer service | Yes      |
 
 ### CircleCI Contexts
 
 #### `azure-dev`
 
-| Variable | Description |
-|----------|-------------|
-| `AZURE_CLIENT_ID` | Service principal app ID |
-| `AZURE_CLIENT_SECRET` | Service principal password |
-| `AZURE_TENANT_ID` | Azure tenant ID |
-| `AZURE_SUBSCRIPTION_ID` | Azure subscription ID |
+| Variable                | Description                |
+|----------               |-------------               |
+| `AZURE_CLIENT_ID`       | Service principal app ID   |
+| `AZURE_CLIENT_SECRET`   | Service principal password |
+| `AZURE_TENANT_ID`       | Azure tenant ID            |
+| `AZURE_SUBSCRIPTION_ID` | Azure subscription ID      |
 
 ---
 
