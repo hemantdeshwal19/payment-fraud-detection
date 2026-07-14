@@ -44,35 +44,35 @@ Developer pushes to dev branch
           │
           ▼
 ┌─────────────────────────────────────────────────────┐
-│                  CircleCI Pipeline                   │
-│                                                      │
-│  config.yml (setup)                                  │
-│     └── path-filtering → continue_config.yml         │
-│                                                      │
-│  Per-service pipeline (only changed service runs):   │
-│                                                      │
-│  secret-scan ──────────────────────┐                 │
-│  sast-scan ─────────────────────── ├── (fan-out)     │
-│  test (python 3.10) ───────────── ─┤                 │
-│  test (python 3.11) ───────────────┘                 │
-│                    │                                 │
-│                    ▼ (fan-in — all must pass)        │
-│              build-and-scan                          │
-│                    │                                 │
-│                    ▼                                 │
-│                 deploy                               │
-│            (azure-dev context)                       │
+│                  CircleCI Pipeline                  │
+│                                                     │
+│  config.yml (setup)                                 │
+│     └── path-filtering → continue_config.yml        │
+│                                                     │
+│  Per-service pipeline (only changed service runs):  │
+│                                                     │
+│  secret-scan ──────────────────────┐                │
+│  sast-scan ─────────────────────── ├── (fan-out)    │
+│  test (python 3.10) ───────────── ─┤                │
+│  test (python 3.11) ───────────────┘                │
+│                    │                                │
+│                    ▼ (fan-in — all must pass)       │
+│              build-and-scan                         │
+│                    │                                │
+│                    ▼                                │
+│                 deploy                              │
+│            (azure-dev context)                      │
 └─────────────────────────────────────────────────────┘
           │
           ▼
 ┌─────────────────────────────────────────────────────┐
-│              Azure Container Apps                    │
-│                                                      │
-│  transaction-api ──► fraud-scorer                    │
-│       :8000               :8001                      │
-│                                                      │
-│  POST /transaction    POST /score                    │
-│  GET  /health         GET  /health                   │
+│              Azure Container Apps                   │
+│                                                     │
+│  transaction-api ──► fraud-scorer                   │
+│       :8000               :8001                     │
+│                                                     │
+│  POST /transaction    POST /score                   │
+│  GET  /health         GET  /health                  │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -169,7 +169,7 @@ Uses the **continuation orb** to implement dynamic config. On every push, a `fil
 
 ```
 secret-scan ──┐
-sast-scan ────┤ (fan-out — all run in parallel)
+sast-scan ────┤ (fan-out — all run in parallel)0
 test-3.10 ────┤
 test-3.11 ────┘
               │
